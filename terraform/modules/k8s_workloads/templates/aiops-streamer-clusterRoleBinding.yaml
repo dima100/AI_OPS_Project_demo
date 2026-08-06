@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: read-k8sgpt-results
+subjects:
+- kind: ServiceAccount
+  name: streamer-sa
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: k8sgpt-reader
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats-streamer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streamer
+  template:
+    metadata:
+      labels:
+        app: streamer
+    spec:
+      serviceAccountName: streamer-sa # Injects the K8s API permissions
+      containers:
+      - name: streamer
+        image: your-registry/aiops-tools:latest
+        command: ["python", "k8sgpt-nats-streamer.py"] # Override command

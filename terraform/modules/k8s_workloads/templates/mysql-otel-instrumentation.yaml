@@ -1,0 +1,5 @@
+# Deprecated: this previous multi-document bundle has been split into:
+# - mysql-otel-credentials-secret.yaml
+# - mysql-exporter-deployment.yaml
+# - mysql-exporter-service.yaml
+# - mysql-exporter-servicemonitor.yaml

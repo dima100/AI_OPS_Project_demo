@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-demo-frontend
+  namespace: default
+  labels:
+    app: otel-demo-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-demo-frontend
+  template:
+    metadata:
+      labels:
+        app: otel-demo-frontend
+    spec:
+      containers:
+      - name: hotrod
+        image: jaegertracing/example-hotrod:latest
+        args: ["all"]
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://otel-collector:4318"
+        - name: OTEL_TRACES_SAMPLER
+          value: "always_on"
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-custom
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  custom-dashboard.json: |
+    {
+      "title": "mysql & App Overview",
+      "panels": [
+        {
+          "type": "stat",
+          "title": "mysql Up Status",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            { "expr": "pg_up", "legendFormat": "mysql Status" }
+          ]
+        }
+      ]
+    }
