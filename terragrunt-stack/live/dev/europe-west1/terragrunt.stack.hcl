@@ -8,6 +8,7 @@ locals {
   zone     = local.env_vars.locals.zone
   raw_ca_cert = local.env_vars.locals.raw_ca_cert
   ai_token = local.token_vars.locals.ai_token
+  github_token = local.token_vars.locals.github_token
 }
 
 
@@ -66,6 +67,7 @@ unit "apps" {
       gke_endpoint       = dependency.gke.outputs.endpoint
       gke_ca_certificate = dependency.gke.outputs.ca_certificate
       ai_token = local.ai_token
+      github_token = local.github_token
     }
   }
 }

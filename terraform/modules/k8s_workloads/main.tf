@@ -35,6 +35,9 @@ resource "helm_release" "k8sgpt_operator" {
       serviceMonitor = {
         enabled = false
       }
+      interplex = {
+        enabled = true # Enables the native in-cluster cache backend
+      }
     })
   ]
 }
@@ -62,44 +65,6 @@ resource "helm_release" "nats" {
 }
 
 
-# 2. Deploy vLLM via the official production stack chart
-# resource "helm_release" "vllm" {
-#   name             = "vllm-server"
-#   repository       = "https://vllm-project.github.io/production-stack"
-#   chart            = "vllm-stack"
-#   namespace        = "ai-serving"
-#   create_namespace = true
-#
-#   timeout = 1200
-#
-#   values = [
-#     yamlencode({
-#       # Note: vllm-stack splits config into components (e.g. engine, router)
-#       engine = {
-#         pvcStorage    = "20Gi"
-#         pvcAccessMode = ["ReadWriteOnce"]
-#         storageClass  = "standard" # Set your Kubernetes cluster's storage class (e.g. gp2, local-path)
-#
-#         resources = {
-#           requests = {
-#             cpu    = "4"
-#             memory = "16Gi"
-#           }
-#           limits = {
-#             cpu    = "8"
-#             memory = "32Gi"
-#           }
-#         }
-#         extraArgs = [
-#           "--model", "Qwen/Qwen2.5-1.5B-Instruct",
-#           "--device", "cpu", # Forces CPU inference for free accounts
-#           "--port", "8000"
-#         ]
-#       }
-#     })
-#   ]
-# }
-
 # 3. Create a dummy secret required by the K8sGPT OpenAI structural validator
 resource "kubernetes_secret" "k8sgpt_api_key" {
   depends_on = [helm_release.k8sgpt_operator] # Ensures namespace exists
@@ -113,6 +78,7 @@ resource "kubernetes_secret" "k8sgpt_api_key" {
     "api-key" = var.ai_token
   }
 }
+
 
 
 resource "time_sleep" "wait_for_k8sgpt_crds" {
@@ -146,6 +112,12 @@ resource "kubectl_manifest" "k8sgpt_config" {
         secret:
           name: k8sgpt-api-key
           key: api-key
+        noCache: false
+        remoteCache:
+          interplex:
+            endpoint: "k8sgpt-operator-interplex-service.k8sgpt-operator-system.svc.cluster.local:8084"
+        analysisConfig:
+          interval: "10m"
       anonymize: false
   YAML
 }
@@ -334,20 +306,6 @@ resource "kubectl_manifest" "mysql_otel_credentials" {
   depends_on = [helm_release.kube_prometheus_stack]
 }
 
-# WordPress OTel ConfigMap
-# resource "kubectl_manifest" "wordpress_otel_config" {
-#   yaml_body = file("${path.module}/templates/wordpress-otel-config.yaml")
-# }
-
-# WordPress with OTel instrumentation (replaces existing wordpress deployment)
-# resource "kubectl_manifest" "wordpress_instrumented" {
-#   yaml_body  = file("${path.module}/templates/wordpress-instrumented.yaml")
-#   depends_on = [
-#     kubernetes_service_v1.mysql_db_svc,
-#     kubectl_manifest.otel_collector,
-#     kubectl_manifest.wordpress_otel_config
-#   ]
-# }
 
 
 resource "kubectl_manifest" "otel_demo_frontend" {
@@ -361,7 +319,62 @@ resource "kubectl_manifest" "otel_demo_frontend_svc" {
 }
 
 
-resource "kubectl_manifest" "dem_app_deployment" {
+resource "kubernetes_secret" "gar_secret" {
+  metadata {
+    name      = "gar-secret"
+    namespace = "default"
+  }
+
+  type = "kubernetes.io/dockerconfigjson"
+
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        "europe-west1-docker.pkg.dev" = {
+          username = "oauth2accesstoken"
+          password = data.google_client_config.default.access_token
+          auth     = base64encode("oauth2accesstoken:${data.google_client_config.default.access_token}")
+        }
+      }
+    })
+  }
+}
+
+
+resource "kubectl_manifest" "demo_app_deployment" {
   yaml_body  = file("${path.module}/templates/demo-app-deployment.yaml")
-  depends_on = [kubernetes_deployment_v1.mysql_db]
+  depends_on = [kubernetes_deployment_v1.mysql_db, kubernetes_secret.gar_secret]
+}
+
+
+resource "kubectl_manifest" "aiop_streamer_sa" {
+  yaml_body  = file("${path.module}/templates/aiops-streamer-serviceAccount.yaml")
+}
+
+resource "kubectl_manifest" "aiop_streamer_sa_rb" {
+  yaml_body  = file("${path.module}/templates/aiops-streamer-clusterRoleBinding.yaml")
+  depends_on = [kubectl_manifest.aiop_streamer_sa]
+}
+
+
+resource "kubectl_manifest" "aiops_streamer_deployment" {
+  yaml_body  = file("${path.module}/templates/aiops-streamer-deployment.yaml")
+  depends_on = [kubectl_manifest.aiop_streamer_sa_rb, helm_release.nats, kubernetes_secret.gar_secret]
+}
+
+resource "kubernetes_secret" "openai_api_key" {
+  metadata {
+    name      = "aiops-secrets"
+    namespace = "default"
+  }
+
+  data = {
+    "openai-key" = var.ai_token
+    "github-key" = var.github_token
+  }
+}
+
+resource "kubectl_manifest" "aiops_agent_deployment" {
+  yaml_body  = file("${path.module}/templates/aiops-agent-deployment.yaml")
+  depends_on = [kubernetes_secret.openai_api_key, kubernetes_secret.gar_secret]
 }

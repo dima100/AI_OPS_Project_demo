@@ -2,17 +2,20 @@ import asyncio
 import json
 import os
 from nats.aio.client import Client as NATS
-from github import Github
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import PromptTemplate
+from github import Github, Auth
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
 
 # Initialize State (Debouncing cache to prevent PR storms)
 processed_alerts = set()
 
 # Initialize LLM and GitHub
 llm = ChatOpenAI(temperature=0, model_name="gpt-4o")
-github_client = Github(os.getenv("GITHUB_TOKEN"))
-repo = github_client.get_repo("your-org/gitops-infrastructure")
+auth = Auth.Token(os.getenv("GITHUB_TOKEN"))
+github_client = Github(auth=auth)
+repo = github_client.get_repo("dima100/AI_OPS_Project_demo")
+
+
 
 prompt_template = PromptTemplate(
     input_variables=["error_details", "resource_name"],

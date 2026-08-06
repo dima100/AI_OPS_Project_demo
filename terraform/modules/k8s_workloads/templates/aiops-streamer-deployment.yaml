@@ -12,8 +12,11 @@ spec:
       labels:
         app: streamer
     spec:
-      serviceAccountName: streamer-sa # Injects the K8s API permissions
+      serviceAccountName: streamer-sa
+      imagePullSecrets:
+      - name: gar-secret # Injects the K8s API permissions
       containers:
       - name: streamer
-        image: your-registry/aiops-tools:latest
+        image: europe-west1-docker.pkg.dev/aiops88/aiops-repo/ai-toolig:latest
         command: ["python", "k8sgpt-nats-streamer.py"] # Override command
+

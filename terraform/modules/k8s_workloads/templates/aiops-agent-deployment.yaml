@@ -12,9 +12,11 @@ spec:
       labels:
         app: ai-agent
     spec:
+      imagePullSecrets:
+      - name: gar-secret # Injects the K8s API permissions
       containers:
       - name: agent
-        image: your-registry/aiops-tools:latest
+        image: europe-west1-docker.pkg.dev/aiops88/aiops-repo/ai-toolig:latest
         command: ["python", "ai_agent.py"] # Override command
         env:
         - name: OPENAI_API_KEY
@@ -26,4 +28,4 @@ spec:
           valueFrom:
             secretKeyRef:
               name: aiops-secrets
-              key: github-token
+              key: github-key

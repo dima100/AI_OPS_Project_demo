@@ -17,4 +17,11 @@ variable "gke_ca_certificate" {
 variable "ai_token" {
   type    = string
   default = "xxx"
+  sensitive   = true
+}
+
+variable "github_token" {
+  type    = string
+  default = "xxx"
+  sensitive   = true
 }
