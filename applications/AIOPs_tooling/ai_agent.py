@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+from collections import deque
 from nats.aio.client import Client as NATS
 from github import Github, Auth
 from langchain_openai import ChatOpenAI
@@ -9,27 +10,43 @@ from langchain_core.prompts import PromptTemplate
 # Initialize State (Debouncing cache to prevent PR storms)
 processed_alerts = set()
 
+
+otel_buffer = deque(maxlen=5)
 # Initialize LLM and GitHub
 llm = ChatOpenAI(temperature=0, model_name="gpt-4o")
 auth = Auth.Token(os.getenv("GITHUB_TOKEN"))
 github_client = Github(auth=auth)
 repo = github_client.get_repo("dima100/AI_OPS_Project_demo")
 
-
-
 prompt_template = PromptTemplate(
-    input_variables=["error_details", "resource_name"],
+    input_variables=["error_details", "resource_name", "telemetry_context"],
     template="""
     You are an expert Kubernetes AIOps agent. 
-    A workload named {resource_name} is failing with this K8sGPT diagnosis:
+    A workload named {resource_name} is failing.
+
+    K8sGPT Diagnosis:
     {error_details}
 
-    Determine the GitOps remediation. We use Helm values in 'clusters/production/demo-app-values.yaml'.
-    If it is an OOMKill, output ONLY the json patch to increase the memory limit.
-    If it is a database connection issue, output the json patch to fix the secret mapping.
-    Return ONLY valid JSON in this format: {{"file_path": "...", "search_string": "...", "replace_string": "..."}}
+    OpenTelemetry Context (Recent App Traces/Metrics):
+    {telemetry_context}
+
+    Determine the GitOps remediation. We use Helm values in 'clusters/production/demo-app-values.yaml'.[cite: 7]
+    If it is an OOMKill, output ONLY the json patch to increase the memory limit.[cite: 7]
+    If it is a database connection issue, output the json patch to fix the secret mapping.[cite: 7]
+    Return ONLY valid JSON in this format: {{"file_path": "...", "search_string": "...", "replace_string": "..."}}[cite: 7]
     """
 )
+
+
+async def otel_handler(msg):
+    try:
+        data = json.loads(msg.data.decode())
+        # Store a stringified, truncated version of the trace to save LLM tokens
+        # OTLP JSON can be large, so we capture the core payload
+        otel_buffer.append(json.dumps(data)[:1000])
+        print(f"📥 Buffered OTel telemetry from {msg.subject}")
+    except Exception as e:
+        print(f"Failed to parse OTel data: {e}")
 
 
 async def message_handler(msg):
@@ -43,12 +60,15 @@ async def message_handler(msg):
     processed_alerts.add(alert_id)
 
     print(f"Investigating anomaly: {data['error']}")
+    telemetry_context = "\n---\n".join(otel_buffer) if otel_buffer else "No recent OTel telemetry available."
 
     # 2. Query LLM for remediation strategy
     prompt = prompt_template.format(
         resource_name=alert_id,
-        error_details=json.dumps(data['error'])
+        error_details=json.dumps(data['error']),
+        telemetry_context=telemetry_context
     )
+
     llm_response = llm.predict(prompt)
     remediation = json.loads(llm_response)
 
@@ -89,7 +109,10 @@ async def main():
     # Subscribe to the alert stream
     await nc.subscribe("aiops.alerts", cb=message_handler)
     print("AI Agent listening for cluster anomalies...")
+    await nc.subscribe("aiops.alerts.otel.traces", cb=otel_handler)
+    await nc.subscribe("aiops.alerts.otel.metrics", cb=otel_handler)
 
+    print("AI Agent listening for cluster anomalies and OpenTelemetry events...")
     # Keep alive
     while True:
         await asyncio.sleep(1)
