@@ -20,3 +20,9 @@ spec:
         image: europe-west1-docker.pkg.dev/aiops88/aiops-repo/ai-toolig:latest
         command: ["python", "k8sgpt-nats-streamer.py"] # Override command
 
+      - name: otel-nats-bridge
+        image: europe-west1-docker.pkg.dev/aiops88/aiops-repo/ai-toolig:latest # Uses the EXACT same image
+        command: ["uvicorn", "bridge:app", "--host", "0.0.0.0", "--port", "8080"]
+        ports:
+        - containerPort: 8080
+          name: http-bridge

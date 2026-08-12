@@ -351,9 +351,15 @@ resource "kubectl_manifest" "aiop_streamer_sa" {
   yaml_body  = file("${path.module}/templates/aiops-streamer-serviceAccount.yaml")
 }
 
+resource "kubectl_manifest" "aiop_streamer_role" {
+  yaml_body  = file("${path.module}/templates/aiops-streamer-clusterRole.yaml")
+  depends_on = [kubectl_manifest.aiop_streamer_sa]
+}
+
+
 resource "kubectl_manifest" "aiop_streamer_sa_rb" {
   yaml_body  = file("${path.module}/templates/aiops-streamer-clusterRoleBinding.yaml")
-  depends_on = [kubectl_manifest.aiop_streamer_sa]
+  depends_on = [kubectl_manifest.aiop_streamer_sa, kubectl_manifest.aiop_streamer_role]
 }
 
 
