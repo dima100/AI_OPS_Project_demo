@@ -18,7 +18,7 @@ spec:
       containers:
       - name: streamer
         image: europe-west1-docker.pkg.dev/aiops88/aiops-repo/ai-toolig:latest
-        command: ["python", "k8sgpt-nats-streamer.py"] # Override command
+        command: ["python", "-u", "k8sgpt-nats-streamer.py"] # Override command
 
       - name: otel-nats-bridge
         image: europe-west1-docker.pkg.dev/aiops88/aiops-repo/ai-toolig:latest # Uses the EXACT same image

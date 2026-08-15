@@ -27,6 +27,21 @@ data:
         timeout: 5s
         send_batch_size: 1000
 
+      filter/trace_errors:
+              error_mode: ignore
+              traces:
+                span:
+                  # Drops the span if the status code is NOT an error
+                  - 'status.code != STATUS_CODE_ERROR'
+  
+      filter/metric_errors:
+              error_mode: ignore
+              metrics:
+                metric:
+                  # Drops metrics unless their name contains 'error' or 'exception'
+                  # The filter processor uses the re2 regex engine, so (?i) makes it case-insensitive
+                  - 'not IsMatch(name, "(?i).*error.*") and not IsMatch(name, "(?i).*exception.*")'
+
     exporters:
       otlp/jaeger:
         endpoint: jaeger-collector:4317
@@ -38,6 +53,12 @@ data:
 
       debug:
         verbosity: detailed
+
+      otlphttp/nats:
+              endpoint: "http://otel-nats-bridge:8080"
+              encoding: json   
+              tls:
+                insecure: true
 
     service:
       telemetry:
@@ -52,3 +73,11 @@ data:
           receivers: [otlp, prometheus]
           processors: [batch]
           exporters: [prometheus]
+        traces/nats:
+          receivers: [otlp]
+          processors: [filter/trace_errors, batch]
+          exporters: [otlphttp/nats]
+        metrics/nats:
+          receivers: [otlp, prometheus]
+          processors: [filter/metric_errors, batch]
+          exporters: [otlphttp/nats]    

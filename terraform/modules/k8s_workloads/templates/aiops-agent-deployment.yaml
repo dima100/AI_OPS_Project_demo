@@ -17,7 +17,8 @@ spec:
       containers:
       - name: agent
         image: europe-west1-docker.pkg.dev/aiops88/aiops-repo/ai-toolig:latest
-        command: ["python", "ai_agent.py"] # Override command
+        imagePullPolicy: Always
+        command: ["python",  "-u", "ai_agent.py"] # Override command
         env:
         - name: OPENAI_API_KEY
           valueFrom:

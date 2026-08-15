@@ -318,6 +318,13 @@ resource "kubectl_manifest" "otel_demo_frontend_svc" {
   depends_on = [kubectl_manifest.otel_demo_frontend]
 }
 
+resource "kubectl_manifest" "aiops_nats_bridge_svc" {
+  yaml_body  = file("${path.module}/templates/aiops-nats-bridge-service.yaml")
+  depends_on = [kubectl_manifest.aiops_streamer_deployment]
+}
+
+
+
 
 resource "kubernetes_secret" "gar_secret" {
   metadata {
