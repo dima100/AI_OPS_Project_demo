@@ -1,4 +1,12 @@
 apiVersion: v1
-kind: ServiceAccount
+kind: Service
 metadata:
-  name: streamer-sa
+  name: otel-nats-bridge
+  namespace: default
+spec:
+  selector:
+    app: streamer
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
